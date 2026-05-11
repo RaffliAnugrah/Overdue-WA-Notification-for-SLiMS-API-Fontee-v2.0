@@ -12,5 +12,5 @@ B. API FONTEE
 
 C. UBAH “Autorized” SESUAI TOKEN.
 - Pada Menu Device Fontee, Klik Token pada device yang dipilih sebagai no wa pengirim, hingga timbul keterangan “Token Copied to Clipboard”.
-- Buka file member_base_lib.inc.php , ubah token pada baris 302 pada code “autorization” paste token.
+- Buka file member_base_lib.inc.php , ubah token pada baris 329 pada code “autorization” paste token.
 
