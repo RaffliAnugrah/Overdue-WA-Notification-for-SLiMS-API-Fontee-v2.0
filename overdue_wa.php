@@ -1,45 +1,62 @@
 <?php
-/**
- * Copyright (C) 2007,2008  Arie Nugraha (dicarve@yahoo.com)
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
- *
- */
 
-// key to authenticate
 define('INDEX_AUTH', '1');
 
 require '../../../sysconfig.inc.php';
+
 // IP based access limitation
 require LIB.'ip_based_access.inc.php';
+
 do_checkIP('smc');
 do_checkIP('smc-membership');
+
+// Start session
 require SB.'admin/default/session.inc.php';
+require SB.'admin/default/session_check.inc.php';
 
-// privileges checking
+// Privileges checking
 $can_read = utility::havePrivilege('membership', 'r');
-if (!$can_read) { die(); }
 
-require SIMBIO.'simbio_UTILS/simbio_date.inc.php';
-require MDLBS.'membership/member_base_lib.inc.php';
+if (!$can_read) {
+    die();
+}
 
-// get data
-$memberID = $dbs->escape_string(trim($_POST['memberID']));
-// create member Instance
+// Required library
+require_once SIMBIO.'simbio_UTILS/simbio_date.inc.php';
+require_once MDLBS.'membership/member_base_lib.inc.php';
+
+// Get member ID
+$memberID = $dbs->escape_string(trim($_POST['memberID'] ?? ''));
+
+if (empty($memberID)) {
+    die('<div class="alert alert-danger">Member ID kosong!</div>');
+}
+
+// Create member object
 $member = new member($dbs, $memberID);
-// send e-mail
+
+// Check member
+if (!$member->valid()) {
+    die('<div class="alert alert-danger">Member tidak ditemukan!</div>');
+}
+
+// Send WhatsApp overdue
 $status = $member->sendOverdueNoticeWA();
-// get message
-echo $message;
+
+// Output result
+if (is_array($status)) {
+
+    $alertType = ($status['status'] == 'SENT')
+        ? 'alert-success'
+        : 'alert-danger';
+
+    echo '<div class="alert '.$alertType.'">'
+        .$status['message'].
+        '</div>';
+
+} else {
+
+    echo '<div class="alert alert-danger">'
+        .$status.
+        '</div>';
+}
