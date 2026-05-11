@@ -297,7 +297,7 @@ public function sendOverdueNoticeWA()
             "Tanggal Pinjam : " . $_overdue['loan_date'] . "\n" .
             "Tanggal Kembali : " . $_overdue['due_date'] . "\n" .
             "Keterlambatan : " . $countoverdue . " hari\n" .
-            "*Anda akan dikenakan sanksi tidak bisa pinjam buku : " . $countoverdue . " hari*\n" .
+            "*Anda akan dikenakan sanksi tidak bisa pinjam buku selama: " . $countoverdue . " hari*\n" .
             //"Denda : Rp. " . $fines . "\n" . //hilangkan tanda (//) jika ingin mengaktifkan deda
             "———————————————————————\n\n";
     }
@@ -326,7 +326,7 @@ public function sendOverdueNoticeWA()
         CURLOPT_POST => true,
         CURLOPT_POSTFIELDS => $payload,
         CURLOPT_HTTPHEADER => array(
-            'Authorization: WfAkgws1KaFUkVRqcWA8'
+            'Authorization: WfAkgws1KaFUkVRqcWA8' //paste token wa dari fonnte disini, setelah Autorization: ...
         ),
     ));
 
