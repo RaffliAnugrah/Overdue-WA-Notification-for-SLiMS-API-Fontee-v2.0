@@ -188,7 +188,7 @@ class member
             //Recipients
             $mail->setFrom($sysconf['mail']['from'], $sysconf['mail']['from_name']);
             $mail->addReplyTo($sysconf['mail']['reply_to'], $sysconf['mail']['reply_to_name']);
-            $mail->addAdress($this->member_email, $this->member_name);
+            $mail->addAddress($this->member_email, $this->member_name);
 
             // Content
             // get message template
@@ -234,86 +234,120 @@ class member
         }
     }
     # send overdue notice whatsapp
-    public function sendOverdueNoticeWA()
-    {
-        global $sysconf;
-        
-        require MDLBS . 'circulation/circulation_base_lib.inc.php';
+   # send overdue notice whatsapp
+public function sendOverdueNoticeWA()
+{
+    global $sysconf;
 
-            $circulation = new circulation($this->obj_db, $this->member_id);
-            $circulation->ignore_holidays_fine_calc = $sysconf['ignore_holidays_fine_calc'];
-            $circulation->holiday_dayname = $_SESSION['holiday_dayname'];
-            $circulation->holiday_date = $_SESSION['holiday_date'];
+    require_once MDLBS . 'circulation/circulation_base_lib.inc.php';
 
-            // date
-            $_curr_date = date('Y-m-d H:i:s');
-            $_today = date('Y-m-d');
+    $circulation = new circulation($this->obj_db, $this->member_id);
 
-            // compile overdue data
-            $_arr_overdued = self::getOverduedLoan($this->obj_db, $this->member_id);
-            foreach ($_arr_overdued as $_overdue) {
-                
-                $countoverdue = $circulation->countOverdueValue($_overdue['loan_id'], date('Y-m-d'))['days'];
-                $fine_each_day= $this->member_type_prop['fine_each_day'];
-                $fines = $countoverdue * $fine_each_day;
-                $fines = number_format($fines, '0', ',', '.');
-                
-                $_overdue_data .= 'Judul : *' . $_overdue['title'] . '*
-Tanggal Pinjam : ' . $_overdue['loan_date'] . '
-Tanggal kembali : ' . $_overdue['due_date'] .'
-Keterlambatan : ' . $countoverdue . ' ' . __('days') . '
-Sanksi Tidak bisa pinjam buku : ' . $countoverdue . ' ' . __('days') . '
-Denda : Rp. *' . $fines . '*
-———————————————————————
-';
-            }
-           
-               $curl = curl_init();
+    $circulation->ignore_holidays_fine_calc =
+        $sysconf['ignore_holidays_fine_calc'];
 
-$message = '_Assalamualaikum_,
-*'.$this->member_name.'* - ID Anggota : '.$this->member_id.'
+    $circulation->holiday_dayname =
+        $_SESSION['holiday_dayname'];
 
-Anda memiliki keterlambatan pinjaman:
+    $circulation->holiday_date =
+        $_SESSION['holiday_date'];
 
-'.$_overdue_data.'
-*Mohon segera dikembalikan ke perpustakaan*,
+    // overdue data
+    $_arr_overdued =
+        self::getOverduedLoan($this->obj_db, $this->member_id);
 
-_Terimakasih_
+    // cek jika tidak ada overdue
+    if (empty($_arr_overdued)) {
 
-_*'.$sysconf['library_name'].'*_';
-
-$payload = array(
-    'target' => $this->member_phone,
-    'message' => $message,
-    'delay' => '2',
-    'countryCode' => '62'
-);
-
-curl_setopt_array($curl, array(
-    CURLOPT_URL => 'https://api.fonnte.com/send',
-    CURLOPT_RETURNTRANSFER => true,
-    CURLOPT_ENCODING => '',
-    CURLOPT_MAXREDIRS => 10,
-    CURLOPT_TIMEOUT => 0,
-    CURLOPT_FOLLOWLOCATION => true,
-    CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
-    CURLOPT_POST => true,
-    CURLOPT_POSTFIELDS => $payload,
-    CURLOPT_HTTPHEADER => array(
-        'Authorization: WfAkgws1KaFUkVRqcWA8'
-    ),
-));
-
-$response = curl_exec($curl);
-if (curl_errno($curl)) {
-    $error_msg = curl_error($curl);
-}
-curl_close($curl);
-
-if (isset($error_msg)) {
-    echo $error_msg;
-}
-echo $response;
+        return array(
+            'status' => 'ERROR',
+            'message' => 'Tidak ada pinjaman terlambat'
+        );
     }
-    
+
+    // WA belum ada
+    if (empty($this->member_phone)) {
+
+        return array(
+            'status' => 'ERROR',
+            'message' => 'Nomor WhatsApp anggota kosong'
+        );
+    }
+
+    // init variable
+    $_overdue_data = '';
+
+    foreach ($_arr_overdued as $_overdue) {
+
+        $countoverdue =
+            $circulation->countOverdueValue(
+                $_overdue['loan_id'],
+                date('Y-m-d')
+            )['days'];
+
+        $fine_each_day =
+            $this->member_type_prop['fine_each_day'];
+
+        $fines = $countoverdue * $fine_each_day;
+
+        $fines = number_format($fines, 0, ',', '.');
+
+        $_overdue_data .=
+            "*Judul : " . $_overdue['title'] . "*\n" .
+            "Tanggal Pinjam : " . $_overdue['loan_date'] . "\n" .
+            "Tanggal Kembali : " . $_overdue['due_date'] . "\n" .
+            "Keterlambatan : " . $countoverdue . " hari\n" .
+            "*Anda akan dikenakan sanksi tidak bisa pinjam buku : " . $countoverdue . " hari*\n" .
+            //"Denda : Rp. " . $fines . "\n" . //hilangkan tanda (//) jika ingin mengaktifkan deda
+            "———————————————————————\n\n";
+    }
+
+    $message =
+        "Assalamualaikum,\n\n" .
+        "*" . $this->member_name . "* - ID Anggota : " . $this->member_id . "\n\n" .
+        "Anda memiliki keterlambatan pinjaman:\n\n" .
+        $_overdue_data .
+        "*Mohon segera dikembalikan ke perpustakaan.*\n\n" .
+        "Terimakasih.\n\n" .
+        "*" . $sysconf['library_name'] . "*";
+
+    $payload = array(
+        'target' => $this->member_phone,
+        'message' => $message,
+        'delay' => '2',
+        'countryCode' => '62'
+    );
+
+    $curl = curl_init();
+
+    curl_setopt_array($curl, array(
+        CURLOPT_URL => 'https://api.fonnte.com/send',
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_POST => true,
+        CURLOPT_POSTFIELDS => $payload,
+        CURLOPT_HTTPHEADER => array(
+            'Authorization: WfAkgws1KaFUkVRqcWA8'
+        ),
+    ));
+
+    $response = curl_exec($curl);
+
+    $error_msg = curl_error($curl);
+
+    curl_close($curl);
+
+    if ($error_msg) {
+
+        return array(
+            'status' => 'ERROR',
+            'message' => $error_msg
+        );
+    }
+
+    return array(
+        'status' => 'SENT',
+        'message' => 'Notifikasi WhatsApp berhasil dikirim ke ' .
+            $this->member_phone
+    );
+}
 }
